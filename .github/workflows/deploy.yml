@@ -1,16 +1,15 @@
-name: Deploy to Server
+name: Deploy On Server
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -20,26 +19,50 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts
+      - name: Add known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Create .env file
+      # === Создаём .env  ===
+      - name: Create .env
         run: |
           cat > .env << EOF
-          BOT_TOKEN=${{ secrets.ENV_BOT_TOKEN }}
-          SUPERADMIN_IDS=${{ secrets.ENV_SUPERADMIN_IDS }}
-          DB_PATH=${{ secrets.ENV_DB_PATH }}
-          PROXY=${{ secrets.ENV_PROXY }}
+          # сюда все твои переменные из секретов
+          APP_ENV=production
+          # ...
           EOF
 
       - name: Copy .env to server
         run: |
           scp -P ${{ secrets.SSH_PORT || 22 }} .env \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/.env
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/root/bots/tabor/.env
 
-      - name: Push to remote server
+      # === Основной деплой  ===
+      - name: Deploy on server
         run: |
-          git remote add deploy ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
-          git push deploy HEAD:main --force
+          ssh -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
+            set -e
+            LOGFILE=~/logs/deploy-logs
+            mkdir -p ~/logs
+            exec > >(tee -a $LOGFILE) 2>&1
+
+            echo "$(date): Starting deploy from GitHub Actions"
+
+            WORKDIR=/root/bots/tabor/
+            cd "$WORKDIR" || { echo "Can'\''t open directory $WORKDIR"; exit 1; }
+
+            # Аналог checkout + merge
+            git fetch origin
+            git checkout deploy
+            git merge --ff-only origin/main || git merge origin/main
+
+            echo "Merged main"
+
+            "$WORKDIR"/venv/bin/pip install -r "$WORKDIR"/requirements.txt
+            echo "Dependencies installed"
+
+            systemctl restart tabor-bot.service
+            echo "Restart service"
+            echo "$(date): Deploy finished successfully"
+          '
