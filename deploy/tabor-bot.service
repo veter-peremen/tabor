@@ -1,0 +1,19 @@
+[Unit]
+Description=Tabor afisha Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Папка с проектом на сервере (поменяйте, если клонировали в другое место)
+WorkingDirectory=/opt/tabor
+# .env читается python-dotenv из WorkingDirectory
+ExecStart=/opt/tabor/.venv/bin/python bot.py
+Restart=always
+RestartSec=5
+# Пользователь, от которого работает бот (создайте отдельного, не root)
+User=tabor
+Group=tabor
+
+[Install]
+WantedBy=multi-user.target
