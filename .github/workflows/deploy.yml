@@ -28,9 +28,10 @@ jobs:
       - name: Create .env
         run: |
           cat > .env << EOF
-          # сюда все твои переменные из секретов
-          APP_ENV=production
-          # ...
+          BOT_TOKEN=${{ secrets.ENV_BOT_TOKEN }}
+          SUPERADMIN_IDS=${{ secrets.ENV_SUPERADMIN_IDS }}
+          DB_PATH=${{ secrets.ENV_DB_PATH }}
+          PROXY=${{ secrets.ENV_PROXY }}
           EOF
 
       - name: Copy .env to server
