@@ -1,0 +1,30 @@
+name: Show Bot Logs
+
+on:
+  workflow_dispatch:          # кнопка "Run workflow" в GitHub
+    inputs:
+      lines:
+        description: 'Сколько последних строк показать'
+        required: true
+        default: '100'
+
+jobs:
+  show-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Show logs
+        run: |
+          ssh -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            echo '=== Last ${{ github.event.inputs.lines }} lines ==='
+            tail -n ${{ github.event.inputs.lines }} /var/log/tabor-bot.log
+          "

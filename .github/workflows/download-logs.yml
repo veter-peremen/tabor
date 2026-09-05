@@ -1,0 +1,44 @@
+name: Download Bot Logs
+
+on:
+  workflow_dispatch:                # кнопка "Run workflow"
+    inputs:
+      lines:
+        description: 'Сколько последних строк скачать (0 = весь файл)'
+        required: true
+        default: '0'
+
+jobs:
+  download-logs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Download log from server
+        run: |
+          if [ "${{ github.event.inputs.lines }}" = "0" ]; then
+            # Скачиваем весь файл
+            scp -P ${{ secrets.SSH_PORT || 22 }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/log/tabor-bot.log \
+              ./tabor-bot.log
+          else
+            # Скачиваем только последние N строк
+            ssh -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+              "tail -n ${{ github.event.inputs.lines }} /var/log/tabor-bot.log" > ./tabor-bot.log
+          fi
+
+      - name: Upload log as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tabor-bot-log
+          path: tabor-bot.log
+          retention-days: 1          # сколько дней хранить
