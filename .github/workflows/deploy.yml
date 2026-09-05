@@ -25,6 +25,20 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          BOT_TOKEN=${{ secrets.ENV_BOT_TOKEN }}
+          SUPERADMIN_IDS=${{ secrets.ENV_SUPERADMIN_IDS }}
+          DB_PATH=${{ secrets.ENV_DB_PATH }}
+          PROXY=${{ secrets.ENV_PROXY }}
+          EOF
+
+      - name: Copy .env to server
+        run: |
+          scp -P ${{ secrets.SSH_PORT || 22 }} .env \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/.env
+
       - name: Push to remote server
         run: |
           git remote add deploy ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
